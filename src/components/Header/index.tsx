@@ -2,12 +2,10 @@ import { LogOut } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { IoFlame, IoDiamond, IoHeart } from 'react-icons/io5'
 import { useUserProfile } from '@/hooks/useUserProfile'
-import { useUserPreferences } from '@/contexts/UserPreferences/UserPreferencesContext'
 import { useAuth } from '@/contexts/AuthContext'
 
 const Header = () => {
   const { profile, loading } = useUserProfile()
-  const { preferences } = useUserPreferences()
   const { logout } = useAuth()
   const navigate = useNavigate()
   const totalXP = profile?.total_xp || 0
@@ -21,33 +19,15 @@ const Header = () => {
     }
   }
 
-  // Ícones e cores para cada linguagem
-  const languageConfig = {
-    html: { icon: 'HTML', color: 'text-orange-500', bg: 'bg-orange-500' },
-    css: { icon: 'CSS', color: 'text-blue-500', bg: 'bg-blue-500' },
-    javascript: { icon: 'JS', color: 'text-[#f7df1e]', bg: 'bg-[#f7df1e]' },
-  }
-
-  const currentLang = preferences.language || 'javascript'
-  const langConfig = languageConfig[currentLang] || languageConfig.javascript
-
-  const handleLanguageIconClick = () => {
-    navigate('/language-selection')
-  }
-
   return (
     <>
       {/* Top bar with icons */}
       <div className="bg-white border-b border-gray-200 py-3 px-4">
         <div className="flex items-center justify-between md:max-w-6xl md:mx-auto">
           <div className="flex items-center gap-2">
-            <button
-              onClick={handleLanguageIconClick}
-              className={`w-7 h-7 ${langConfig.bg} rounded flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity`}
-              title="Trocar linguagem"
-            >
-              <span className="text-white font-bold text-xs">{langConfig.icon}</span>
-            </button>
+            <div className="w-7 h-7 bg-[#f7df1e] rounded flex items-center justify-center">
+              <span className="text-black font-bold text-xs">JS</span>
+            </div>
           </div>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
@@ -81,9 +61,6 @@ const Header = () => {
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              {/* <button className="text-white hover:opacity-80 transition-opacity">
-                <ArrowLeft size={24} />
-              </button> */}
               <div>
                 <div className="text-white/90 text-sm font-semibold uppercase tracking-wide">
                   SEÇÃO 1, UNIDADE 1
@@ -93,10 +70,6 @@ const Header = () => {
                 </h1>
               </div>
             </div>
-            {/* <button className="bg-white/20 hover:bg-white/30 text-white rounded-xl px-4 py-2 flex items-center gap-2 font-bold transition-colors">
-              <List size={20} />
-              GUIA
-            </button> */}
           </div>
         </div>
       </header>

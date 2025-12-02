@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { X } from 'lucide-react'
-import { useUserPreferences } from '@/contexts/UserPreferences/UserPreferencesContext'
 import { lessonsData, type Question } from '@/lib/lessonsData'
 import AnswerFeedbackPopup from '@/components/AnswerFeedbackPopup'
 
@@ -9,7 +8,6 @@ const LessonScreen = () => {
   // 1. Pegar o ID da lição da URL
   const { lessonId } = useParams<{ lessonId: string }>()
   const navigate = useNavigate()
-  const { preferences } = useUserPreferences()
 
   // 2. Estados da lição
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
@@ -22,9 +20,9 @@ const LessonScreen = () => {
   const [showFeedback, setShowFeedback] = useState(false)
   const [feedbackType, setFeedbackType] = useState<'correct' | 'incorrect' | null>(null)
 
-  // 3. Buscar a lição atual baseada no ID da URL
-  const lesson = preferences.language && preferences.level && lessonId
-    ? lessonsData[preferences.language][preferences.level].find(l => l.id === lessonId)
+  // 3. Buscar a lição atual baseada no ID da URL (sempre do nível beginner)
+  const lesson = lessonId
+    ? lessonsData['beginner'].find(l => l.id === lessonId)
     : null
 
   // 4. Se não encontrou a lição, mostra mensagem de erro
@@ -47,7 +45,10 @@ const LessonScreen = () => {
   // 5. Pegar a pergunta atual e calcular progresso
   const currentQuestion: Question = lesson.questions[currentQuestionIndex]
   const totalQuestions = lesson.questions.length
-  const progress = ((currentQuestionIndex + 1) / totalQuestions) * 100
+  // Progresso: avança quando a pergunta é respondida corretamente
+  const progress = showResult && isCorrect 
+    ? ((currentQuestionIndex + 1) / totalQuestions) * 100
+    : (currentQuestionIndex / totalQuestions) * 100
 
   // 6. Função ao selecionar uma resposta
   const handleAnswerSelect = (index: number) => {
@@ -86,7 +87,7 @@ const LessonScreen = () => {
     })
   }
 
-  
+
 
   // 8. Função ao clicar em "Continuar" ou "Finalizar"
   const handleNext = () => {
@@ -110,13 +111,14 @@ const LessonScreen = () => {
       setShowResult(false)
       setIsCorrect(false)
     } else {
-      // Acabou todas as perguntas
-      // CALCULAR valores finais porque os estados ainda não 
-      if (currentQuestionIndex < totalQuestions - 1) {
-
-        console.log('rota de sucesso');
-
-        // 2. Tela de SUCESSO
+      // Acabou todas as perguntas - calcular valores finais
+      const finalCorrectAnswers = isCorrect ? correctAnswers + 1 : correctAnswers
+      const finalWrongAnswers = isCorrect ? wrongAnswers : wrongAnswers + 1
+      
+      // Se acertou todas, vai para tela de sucesso
+      if (finalWrongAnswers === 0) {
+        console.log('Navegando para sucesso - XP:', lesson.xpReward)
+        
         navigate('/lesson-success', {
           state: {
             lessonId,
@@ -125,13 +127,13 @@ const LessonScreen = () => {
           },
         })
       } else {
-        console.log('rota de erro');
-
-        // 3. Tela de RESULTADO (teve erros)
+        // Se teve erros, vai para tela de resultado
+        console.log('Navegando para resultado')
+        
         navigate('/lesson-result', {
           state: {
-            correctAnswers: correctAnswers,  // ← USAR OS VALORES FINAIS
-            wrongAnswers: wrongAnswers,       // ← USAR OS VALORES FINAIS
+            correctAnswers: finalCorrectAnswers,
+            wrongAnswers: finalWrongAnswers,
             totalQuestions,
             lessonId,
           },

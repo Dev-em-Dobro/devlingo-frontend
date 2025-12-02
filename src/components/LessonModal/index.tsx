@@ -1,7 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { X } from 'lucide-react'
-import { useUserPreferences } from '@/contexts/UserPreferences/UserPreferencesContext'
 import { lessonsData } from '@/lib/lessonsData'
 import DevlingoChar from '@/assets/images/devlingo-char.png'
 
@@ -14,7 +13,6 @@ interface LessonModalProps {
 
 const LessonModal = ({ isOpen, onClose, unitId = 1 }: LessonModalProps) => {
   const navigate = useNavigate()
-  const { preferences } = useUserPreferences()
 
   // 2. Estado para controlar qual lição está selecionada
   const [selectedLessonIndex, setSelectedLessonIndex] = useState<number | null>(null)
@@ -26,11 +24,10 @@ const LessonModal = ({ isOpen, onClose, unitId = 1 }: LessonModalProps) => {
     }
   }, [unitId, isOpen])
 
-  // 4. Buscar todas as lições baseadas nas preferências do usuário
+  // 4. Buscar todas as lições (sempre do nível beginner)
   const allLessons = useMemo(() => {
-    if (!preferences.language || !preferences.level) return []
-    return lessonsData[preferences.language]?.[preferences.level] || []
-  }, [preferences.language, preferences.level])
+    return lessonsData['beginner'] || []
+  }, [])
 
   // 5. Configuração de unidades (mesmo número usado no LessonPath)
   const totalUnits = 5

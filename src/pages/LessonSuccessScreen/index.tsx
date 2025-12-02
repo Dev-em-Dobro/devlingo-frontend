@@ -1,16 +1,80 @@
 import { useNavigate, useLocation } from 'react-router-dom'
+import { useEffect } from 'react'
 import DevlingoChar from '@/assets/images/devlingo-char.png'
+import { lessonsData } from '@/lib/lessonsData'
+
+const STORAGE_KEY = 'devlingo_user_xp'
+const COMPLETED_UNITS_KEY = 'devlingo_completed_units'
+
 const LessonSuccessScreen = () => {
   const navigate = useNavigate()
   const location = useLocation()
 
   // 1. Pegar dados passados pela navegação
-  const { xpEarned, accuracy } = (location.state as {
+  const { xpEarned, accuracy, lessonId } = (location.state as {
     xpEarned?: number
     accuracy?: number
+    lessonId?: string
   }) || {}
 
-  // 2. Função para continuar (volta para home)
+  // 2. Salvar XP e verificar conclusão de unidade
+  useEffect(() => {
+    if (xpEarned) {
+      // Salvar XP
+      const currentXP = localStorage.getItem(STORAGE_KEY)
+      const totalXP = currentXP ? parseInt(currentXP, 10) : 0
+      const newTotalXP = totalXP + xpEarned
+      
+      localStorage.setItem(STORAGE_KEY, newTotalXP.toString())
+      console.log(`XP atualizado: ${totalXP} + ${xpEarned} = ${newTotalXP}`)
+    }
+
+    // Verificar e salvar unidade concluída
+    if (lessonId) {
+      const allLessons = lessonsData['beginner'] || []
+      const lessonIndex = allLessons.findIndex(l => l.id === lessonId)
+      
+      if (lessonIndex !== -1) {
+        const totalUnits = 5
+        const lessonsPerUnit = Math.ceil(allLessons.length / totalUnits)
+        const unitId = Math.floor(lessonIndex / lessonsPerUnit) + 1
+        
+        // Verificar se todas as lições da unidade foram completadas
+        const unitStartIndex = (unitId - 1) * lessonsPerUnit
+        const unitEndIndex = Math.min(unitStartIndex + lessonsPerUnit, allLessons.length)
+        const unitLessons = allLessons.slice(unitStartIndex, unitEndIndex)
+        
+        // Buscar lições completadas
+        const completedLessonsStr = localStorage.getItem('devlingo_completed_lessons') || '[]'
+        const completedLessons: string[] = JSON.parse(completedLessonsStr)
+        
+        // Adicionar lição atual às completadas
+        if (!completedLessons.includes(lessonId)) {
+          completedLessons.push(lessonId)
+          localStorage.setItem('devlingo_completed_lessons', JSON.stringify(completedLessons))
+        }
+        
+        // Verificar se todas as lições da unidade foram completadas
+        const allUnitLessonsCompleted = unitLessons.every(lesson => 
+          completedLessons.includes(lesson.id)
+        )
+        
+        if (allUnitLessonsCompleted) {
+          // Marcar unidade como concluída
+          const completedUnitsStr = localStorage.getItem(COMPLETED_UNITS_KEY) || '[]'
+          const completedUnits: number[] = JSON.parse(completedUnitsStr)
+          
+          if (!completedUnits.includes(unitId)) {
+            completedUnits.push(unitId)
+            localStorage.setItem(COMPLETED_UNITS_KEY, JSON.stringify(completedUnits))
+            console.log(`Unidade ${unitId} concluída!`)
+          }
+        }
+      }
+    }
+  }, [xpEarned, lessonId])
+
+  // 3. Função para continuar (volta para home)
   const handleContinue = () => {
     navigate('/')
   }

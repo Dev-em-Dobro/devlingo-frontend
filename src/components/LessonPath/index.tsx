@@ -1,19 +1,44 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import LessonNode from '@/components/LessonNode'
 import LessonModal from '@/components/LessonModal'  // 1. Importar o modal
+
+const COMPLETED_UNITS_KEY = 'devlingo_completed_units'
 
 const LessonPath = () => {
   // 1. Estado para controlar qual unidade está selecionada
   const [selectedUnitId, setSelectedUnitId] = useState<number | null>(null)
-    // 2. Estados para controlar o modal
+  // 2. Estados para controlar o modal
   const [isModalOpen, setIsModalOpen] = useState(false)
+  // 3. Estado para unidades completadas
+  const [completedUnits, setCompletedUnits] = useState<number[]>([])
 
-  // 2. Definir as unidades (por enquanto fixo)
+  // 4. Carregar unidades completadas do localStorage
+  useEffect(() => {
+    const loadCompletedUnits = () => {
+      const completedUnitsStr = localStorage.getItem(COMPLETED_UNITS_KEY) || '[]'
+      const completed: number[] = JSON.parse(completedUnitsStr)
+      setCompletedUnits(completed)
+    }
+
+    loadCompletedUnits()
+
+    // Listener para atualizar quando outra aba modificar
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === COMPLETED_UNITS_KEY) {
+        loadCompletedUnits()
+      }
+    }
+
+    window.addEventListener('storage', handleStorageChange)
+    return () => window.removeEventListener('storage', handleStorageChange)
+  }, [])
+
+  // 5. Definir as unidades (por enquanto fixo)
   const totalUnits = 5
 
-  // 3. Criar array de unidades com posições
+  // 6. Criar array de unidades com posições
   const units = Array.from({ length: totalUnits }, (_, i) => i + 1).map((unitId) => {
-    // 4. Offsets para criar o efeito de "caminho ondulado"
+    // 7. Offsets para criar o efeito de "caminho ondulado"
     const offsets: Record<number, number> = {
       1: 0,      // Centro
       2: -40,    // Esquerda
@@ -22,10 +47,18 @@ const LessonPath = () => {
       5: -40,    // Volta um pouco
     }
 
-    // 5. Determinar o status de cada unidade
-    // Por enquanto: primeira disponível, resto bloqueado
+    // 8. Determinar o status de cada unidade
     const getStatus = (id: number): 'available' | 'locked' | 'completed' => {
+      // Se foi concluída, mostra como completed
+      if (completedUnits.includes(id)) return 'completed'
+
+      // Primeira unidade sempre disponível
       if (id === 1) return 'available'
+
+      // Unidade disponível se a anterior foi concluída
+      if (completedUnits.includes(id - 1)) return 'available'
+
+      // Senão, está bloqueada
       return 'locked'
     }
 
@@ -37,7 +70,7 @@ const LessonPath = () => {
     }
   })
 
-  // 6. Função ao clicar em uma unidade
+  // 9. Função ao clicar em uma unidade
   const handleUnitClick = (unitId: number, status: 'available' | 'locked' | 'completed') => {
     // Só abre se não estiver bloqueada
     if (status === 'available' || status === 'completed') {
@@ -48,7 +81,7 @@ const LessonPath = () => {
 
   return (
     <div className="max-w-2xl mx-auto py-12 relative overflow-x-hidden px-4">
-      {/* 7. Container das estrelas */}
+      {/* 10. Container das estrelas */}
       <div className="flex flex-col items-center gap-4">
         {units.map((unit, index) => (
           <div
@@ -84,7 +117,7 @@ const LessonPath = () => {
       <LessonModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        unitId={selectedUnitId}
+        unitId={selectedUnitId ?? undefined}
       />
     </div>
   )

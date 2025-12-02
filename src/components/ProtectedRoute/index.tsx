@@ -6,8 +6,7 @@
 // ============================================================
 
 import { Navigate, useLocation } from 'react-router-dom'
-import { useAuth } from '../../contexts/AuthContext'
-import LoadingScreen from '../LoadingScreen'
+import { useAuth } from '@/contexts/AuthContext'
 
 // ------------------------------------------------------------
 // 1. DEFINIÇÃO DOS TIPOS
@@ -25,11 +24,14 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   // Obtém os dados de autenticação do contexto
   const { isAuthenticated, loading } = useAuth()
   
-  console.log("isAuthenticated", isAuthenticated);
-  
-  
   // Obtém a localização atual (qual rota o usuário tentou acessar)
   const location = useLocation()
+
+  console.log('🔒 [ProtectedRoute] Verificando acesso:', {
+    rota: location.pathname,
+    isAuthenticated,
+    loading
+  })
 
   // ----------------------------------------------------------
   // 2.1 ESTADO DE CARREGAMENTO
@@ -39,7 +41,15 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   // verificar se o usuário já está logado.
   
   if (loading) {
-    return <LoadingScreen isFadingOut={false} />
+    console.log('⏳ [ProtectedRoute] Carregando autenticação...')
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Carregando...</p>
+        </div>
+      </div>
+    )
   }
 
   // ----------------------------------------------------------
@@ -55,17 +65,17 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   // clicando no botão "voltar" do navegador.
   
   if (!isAuthenticated) {
+    console.log('❌ [ProtectedRoute] Usuário não autenticado - redirecionando para login')
+    console.log('📍 [ProtectedRoute] Rota original salva:', location.pathname)
     return <Navigate to="/login" state={{ from: location }} replace />
   }
-
-  console.log('passou');
-  
 
   // ----------------------------------------------------------
   // 2.3 USUÁRIO AUTENTICADO
   // ----------------------------------------------------------
   // Se chegou aqui, o usuário está logado. Mostra o conteúdo.
   
+  console.log('✅ [ProtectedRoute] Usuário autenticado - permitindo acesso')
   return <>{children}</>
 }
 

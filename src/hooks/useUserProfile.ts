@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { supabase } from '../lib/supabase'
 
 interface UserProfile {
   id: string
@@ -8,6 +7,8 @@ interface UserProfile {
   name: string | null
   total_xp: number
 }
+
+const STORAGE_KEY = 'devlingo_user_xp'
 
 export const useUserProfile = () => {
   const { user } = useAuth()
@@ -23,26 +24,27 @@ export const useUserProfile = () => {
       return
     }
 
-    // 2. Buscar perfil do banco
-    const fetchProfile = async () => {
+    // 2. Buscar XP do localStorage
+    const fetchProfile = () => {
       try {
         setLoading(true)
-        const { data, error: fetchError } = await supabase
-          .from('user_profiles')
-          .select('id, email, name, total_xp')
-          .eq('id', user.id)           // Busca pelo ID do usuário logado
-          .single()                    // Retorna um único registro
+        
+        // Busca o XP do localStorage ou inicia com 0
+        const storedXP = localStorage.getItem(STORAGE_KEY)
+        const totalXP = storedXP ? parseInt(storedXP, 10) : 0
 
-        if (fetchError) {
-          console.error('Erro ao buscar perfil:', fetchError)
-          setError(fetchError as Error)
-          setProfile(null)
-        } else {
-          setProfile(data)
-          setError(null)
+        // Cria o perfil com dados do usuário + XP do localStorage
+        const userProfile: UserProfile = {
+          id: user.email, // Usa email como ID já que não temos id no tipo User
+          email: user.email || '',
+          name: user.name || null,
+          total_xp: totalXP
         }
+
+        setProfile(userProfile)
+        setError(null)
       } catch (err) {
-        console.error('Erro inesperado:', err)
+        console.error('Erro ao carregar perfil:', err)
         setError(err as Error)
         setProfile(null)
       } finally {
@@ -52,27 +54,18 @@ export const useUserProfile = () => {
 
     fetchProfile()
 
-    // 3. (Opcional) Listener para atualizações em tempo real
-    // Se o XP mudar em outro lugar, atualiza automaticamente
-    const channel = supabase
-      .channel('user_profile_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'user_profiles',
-          filter: `id=eq.${user.id}`,  // Só escuta mudanças do usuário atual
-        },
-        (payload) => {
-          console.log('Perfil atualizado:', payload.new)
-          setProfile(payload.new as UserProfile)
-        }
-      )
-      .subscribe()
+    // 3. Listener para mudanças no localStorage (sincroniza entre abas)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === STORAGE_KEY && e.newValue) {
+        const newXP = parseInt(e.newValue, 10)
+        setProfile(prev => prev ? { ...prev, total_xp: newXP } : null)
+      }
+    }
+
+    window.addEventListener('storage', handleStorageChange)
 
     return () => {
-      supabase.removeChannel(channel)  // Limpa o listener ao desmontar
+      window.removeEventListener('storage', handleStorageChange)
     }
   }, [user])
 
