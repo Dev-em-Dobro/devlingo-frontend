@@ -8,7 +8,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 import Home from './pages/Home'
 import LessonScreen from './pages/LessonScreen'
 import LessonSuccessScreen from './pages/LessonSuccessScreen'
-import LessonResultScreen from './pages/LessonResultScreen'
+import LessonResultScreen from './pages/LessonFailureScreen'
 
 function App() {
   const [isLoading, setIsLoading] = useState(true)

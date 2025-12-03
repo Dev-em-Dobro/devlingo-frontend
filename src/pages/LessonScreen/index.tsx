@@ -1,31 +1,26 @@
 import { useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
 import { X } from 'lucide-react'
-import { lessonsData, type Question } from '@/lib/lessonsData'
+import { useParams, useNavigate } from 'react-router-dom'
+import { lessonsData, type Lesson } from '@/lib/lessonsData'
 import AnswerFeedbackPopup from '@/components/AnswerFeedbackPopup'
+import { saveLessonScore } from '@/lib/saveLessonScore'
 
 const LessonScreen = () => {
-  // 1. Pegar o ID da lição da URL
   const { lessonId } = useParams<{ lessonId: string }>()
   const navigate = useNavigate()
-
-  // 2. Estados da lição
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null)
   const [showResult, setShowResult] = useState(false)
-  const [lives, setLives] = useState(3)
   const [isCorrect, setIsCorrect] = useState(false)
+  const [showFeedback, setShowFeedback] = useState(false)
   const [correctAnswers, setCorrectAnswers] = useState(0)
   const [wrongAnswers, setWrongAnswers] = useState(0)
-  const [showFeedback, setShowFeedback] = useState(false)
-  const [feedbackType, setFeedbackType] = useState<'correct' | 'incorrect' | null>(null)
+  const [lives, setLives] = useState(3)
+  const [isSavingScore, setIsSavingScore] = useState(false)
 
-  // 3. Buscar a lição atual baseada no ID da URL (sempre do nível beginner)
-  const lesson = lessonId
-    ? lessonsData['beginner'].find(l => l.id === lessonId)
-    : null
+  // Buscar a lição baseada no ID da URL
+  const lesson = lessonsData.find(l => l.id === lessonId)
 
-  // 4. Se não encontrou a lição, mostra mensagem de erro
   if (!lesson) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
@@ -42,31 +37,18 @@ const LessonScreen = () => {
     )
   }
 
-  // 5. Pegar a pergunta atual e calcular progresso
-  const currentQuestion: Question = lesson.questions[currentQuestionIndex]
-  const totalQuestions = lesson.questions.length
-  // Progresso: avança quando a pergunta é respondida corretamente
-  const progress = showResult && isCorrect 
-    ? ((currentQuestionIndex + 1) / totalQuestions) * 100
-    : (currentQuestionIndex / totalQuestions) * 100
-
-  // 6. Função ao selecionar uma resposta
   const handleAnswerSelect = (index: number) => {
-    if (showResult) return // Não permite mudar depois de verificar
+    if (showResult) return
     setSelectedAnswer(index)
   }
 
-  // 7. Função ao clicar em "Verificar"
+  // Função ao clicar em "Verificar"
   const handleCheck = () => {
-    if (selectedAnswer === null) return // Precisa ter selecionado algo
-
-    // Verificar se está correto
+    if (selectedAnswer === null) return
+    
     const correct = selectedAnswer === currentQuestion.correctAnswer
     setIsCorrect(correct)
     setShowResult(true)
-
-    // Mostrar feedback
-    setFeedbackType(correct ? 'correct' : 'incorrect')
     setShowFeedback(true)
 
     // Atualizar contadores
@@ -76,73 +58,94 @@ const LessonScreen = () => {
       setWrongAnswers(prev => prev + 1)
       setLives(prev => Math.max(0, prev - 1))
     }
-
-    // DEBUG
-    console.log('Após check:', {
-      correct,
-      correctAnswers,
-      wrongAnswers,
-      currentIndex: currentQuestionIndex,
-      totalQuestions
-    })
   }
 
+    const handleContinue = async () => {
+      setShowFeedback(false)
 
+      // Verifica se acabaram as vidas
+      if (lives === 0) {
+        navigate('/lesson-result', {
+          state: {
+            lessonId,
+            correctAnswers,
+            wrongAnswers,
+            totalQuestions,
+          },
+        })
+        return
+      }
 
-  // 8. Função ao clicar em "Continuar" ou "Finalizar"
-  const handleNext = () => {
-    // Esconder feedback antes de avançar
-    setShowFeedback(false)
-    setFeedbackType(null)
-
-    // DEBUG - Ver valores ANTES da checagem
-    console.log('handleNext - valores atuais:', {
-      correctAnswers,
-      wrongAnswers,
-      isCorrect,
-      currentQuestionIndex,
-      totalQuestions
-    })
-
+    console.log("currentQuestionIndex", currentQuestionIndex < totalQuestions - 1);
+    
+    
+    // Se ainda tem perguntas, vai para próxima
     if (currentQuestionIndex < totalQuestions - 1) {
-      // Ainda tem perguntas: vai para próxima
       setCurrentQuestionIndex(prev => prev + 1)
       setSelectedAnswer(null)
       setShowResult(false)
-      setIsCorrect(false)
     } else {
-      // Acabou todas as perguntas - calcular valores finais
-      const finalCorrectAnswers = isCorrect ? correctAnswers + 1 : correctAnswers
-      const finalWrongAnswers = isCorrect ? wrongAnswers : wrongAnswers + 1
-      
-      // Se acertou todas, vai para tela de sucesso
-      if (finalWrongAnswers === 0) {
-        console.log('Navegando para sucesso - XP:', lesson.xpReward)
+
+      console.log(correctAnswers);
+
+      console.log(totalQuestions);
+
+      if (correctAnswers === totalQuestions) {
+        setIsSavingScore(true)
+
+        // salvar no localStorage o xp, ja vamos criar essa fnção que depois vai salvar no supabase
+        // mas por enquanto só salva no localStorage mesmo
+        try {
+            const result = await saveLessonScore({
+              userId: "1", // temporário, depois pega do user logado
+              lessonId,
+              correctAnswers,
+              wrongAnswers,
+              xpEarned: lesson.xpReward,
+            })
+
+            if (result.error) {
+              console.error('Erro ao salvar pontuação:', result.error)
+              // Continua mesmo com erro ao salvar
+            }
+
+            // Salvar lição como completada no localStorage
+            const completedLessonsStr = localStorage.getItem('devlingo_completed_lessons') || '[]'
+            const completedLessons: string[] = JSON.parse(completedLessonsStr)
+            
+            if (lessonId && !completedLessons.includes(lessonId)) {
+              completedLessons.push(lessonId)
+              localStorage.setItem('devlingo_completed_lessons', JSON.stringify(completedLessons))
+            }
+          } catch (error) {
+            console.error('Erro inesperado ao salvar pontuação:', error)
+          } finally {
+            setIsSavingScore(false)
+          }
         
-        navigate('/lesson-success', {
-          state: {
-            lessonId,
-            xpEarned: lesson.xpReward,
-            accuracy: 100,
-          },
-        })
+          // Acabou as perguntas, volta para home
+          // mas depois vamos mostrar a tela de resultado
+          //navigate('/')
+            navigate('/lesson-success', {
+              state: {
+                lessonId,
+                xpEarned: lesson.xpReward,
+                accuracy: 100,
+              },
+            })
       } else {
-        // Se teve erros, vai para tela de resultado
-        console.log('Navegando para resultado')
-        
         navigate('/lesson-result', {
           state: {
-            correctAnswers: finalCorrectAnswers,
-            wrongAnswers: finalWrongAnswers,
-            totalQuestions,
             lessonId,
+            correctAnswers,
+            wrongAnswers,
+            totalQuestions,
           },
         })
       }
     }
   }
 
-  // 9. Função para pular pergunta
   const handleSkip = () => {
     if (currentQuestionIndex < totalQuestions - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1)
@@ -152,45 +155,27 @@ const LessonScreen = () => {
     }
   }
 
-  // 10. Se perdeu todas as vidas, mostra mensagem
-  if (lives <= 0 && currentQuestionIndex < totalQuestions - 1) {
-    return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold mb-4 text-red-600">Você perdeu todas as vidas!</h2>
-          <button
-            onClick={() => navigate('/')}
-            className="bg-[#58CC02] text-white px-6 py-2 rounded-xl"
-          >
-            Voltar para Home
-          </button>
-        </div>
-      </div>
-    )
-  }
+  // Pegar a pergunta atual da lição
+  const currentQuestion = lesson.questions[currentQuestionIndex]
+  const totalQuestions = lesson.questions.length
+  const progress = ((currentQuestionIndex + 1) / totalQuestions) * 100
 
   return (
     <div className="min-h-screen bg-white">
-      {/* ===== TOP BAR ===== */}
+      {/* Top Bar */}
       <div className="bg-white border-b border-gray-200 py-4 px-4">
         <div className="flex items-center justify-between max-w-4xl mx-auto">
-          {/* 11. Botão de fechar */}
-          <button
-            onClick={() => navigate('/')}
-            className="text-gray-600 hover:text-gray-900 transition-colors"
-          >
+          {/* Botão fechar */}
+          <button onClick={() => navigate('/')} className="text-gray-600 hover:text-gray-900">
             <X size={24} />
           </button>
 
-          {/* 12. Barra de progresso */}
-          <div className="flex-1 h-2 bg-gray-200 rounded-full mx-4 overflow-hidden">
-            <div
-              className="h-full bg-gray-600 rounded-full transition-all duration-300"
-              style={{ width: `${progress}%` }}
-            />
+      {/* Barra de progresso */}
+          <div className="flex-1 h-2 bg-gray-200 rounded-full mx-4">
+            <div className="h-full bg-gray-600 rounded-full transition-all" style={{ width: `${progress}%` }} />
           </div>
 
-          {/* 13. Contador de vidas */}
+          {/* Vidas */}
           <div className="flex items-center gap-2">
             <span className="text-red-500 text-xl">❤️</span>
             <span className="font-bold text-gray-700">{lives}</span>
@@ -198,41 +183,37 @@ const LessonScreen = () => {
         </div>
       </div>
 
-      {/* ===== CONTEÚDO PRINCIPAL ===== */}
+      {/* Conteúdo */}
       <div className="max-w-4xl mx-auto px-4 py-8">
-        {/* 14. Badge "PALAVRA NOVA" (só na primeira pergunta) */}
-        {currentQuestionIndex === 0 && (
-          <div className="bg-[#9225D4] text-white px-4 py-2 rounded-full text-sm font-semibold inline-block mb-4">
-            PALAVRA NOVA
-          </div>
-        )}
 
-        {/* 15. Pergunta */}
+        {/* Pergunta */}
         <h2 className="text-3xl font-bold text-gray-900 mb-8">
           {currentQuestion.question}
         </h2>
 
-        {/* 16. Opções de resposta */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        {/* Opções */}
+        <div className="grid md:grid-cols-3 gap-4 mb-8">
           {currentQuestion.options?.map((option, index) => {
+
+            // verifica se a opção é a selecionada ou a correta
             const isSelected = selectedAnswer === index
             const isCorrectAnswer = index === currentQuestion.correctAnswer
+            
+            // função para determinar a classe CSS do botão
+            const getButtonClass = () => {
 
-            // 17. Determinar classe CSS baseada no estado
-            let buttonClass = 'bg-white border-2 border-gray-300 text-gray-800 hover:border-gray-400'
-
-            if (showResult) {
-              // Depois de verificar
-              if (isCorrectAnswer) {
-                buttonClass = 'bg-green-500 border-2 border-green-600 text-white'
-              } else if (isSelected && !isCorrect) {
-                buttonClass = 'bg-red-500 border-2 border-red-600 text-white'
-              } else {
-                buttonClass = 'bg-white border-2 border-gray-300 text-gray-800 opacity-50'
+              // se é pra ja mostrar o resultado, muda as cores conforme se está certo ou errado
+              if (showResult) {
+                if (isCorrectAnswer) return 'bg-green-500 border-green-600 text-white'
+                if (isSelected) return 'bg-red-500 border-red-600 text-white'
+                return 'bg-white border-gray-300 text-gray-800 opacity-50'
               }
-            } else if (isSelected) {
-              // Selecionado mas ainda não verificou
-              buttonClass = 'bg-blue-100 border-2 border-blue-500 text-gray-800'
+
+              // se não mostrou o resultado ainda, mas está selecionado, muda a cor
+              if (isSelected) return 'bg-blue-100 border-blue-500 text-gray-800'
+              
+              // estado normal do botão
+              return 'bg-white border-gray-300 text-gray-800 hover:border-gray-400'
             }
 
             return (
@@ -241,69 +222,360 @@ const LessonScreen = () => {
                 onClick={() => handleAnswerSelect(index)}
                 disabled={showResult}
                 className={`
-                  p-6 rounded-2xl text-left transition-all relative
-                  ${buttonClass}
+                  p-6 rounded-2xl text-left transition-all relative border-2
+                  ${getButtonClass()}
                 `}
               >
-                {/* 18. Número no canto inferior direito */}
                 <div className="absolute bottom-2 right-2 w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-sm font-bold">
                   {index + 1}
                 </div>
-                {/* 19. Texto da opção */}
                 <div className="font-semibold text-lg mb-2">{option}</div>
               </button>
             )
           })}
         </div>
 
-        {/* 20. Botões de ação (escondidos quando feedback está visível) */}
-        {!showFeedback && (
-          <div className="flex gap-4 justify-between">
-            {/* Botão Pular */}
-            <button
-              onClick={handleSkip}
-              disabled={showResult && isCorrect}
-              className="px-8 py-4 bg-gray-300 text-gray-700 rounded-2xl font-bold uppercase disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-400 transition-colors"
-            >
-              Pular
-            </button>
-
-            {/* Botão Verificar ou Continuar */}
-            {!showResult ? (
-              <button
-                onClick={handleCheck}
-                disabled={selectedAnswer === null}
-                className={`
-                  px-8 py-4 rounded-2xl font-bold uppercase transition-colors
-                  ${selectedAnswer !== null
-                    ? 'bg-[#58CC02] text-white hover:bg-[#4cb302]'
-                    : 'bg-gray-300 text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-400'
-                  }
-                `}
-              >
-                Verificar
-              </button>
-            ) : (
-              <button
-                onClick={handleNext}
-                className="px-8 py-4 bg-[#58CC02] text-white rounded-2xl font-bold uppercase hover:bg-[#4cb302] transition-colors"
-              >
-                {currentQuestionIndex < totalQuestions - 1 ? 'Continuar' : 'Finalizar'}
-              </button>
-            )}
-          </div>
-        )}
+        {/* Botões */}
+        <div className="flex gap-4 justify-between">
+          <button onClick={handleSkip}
+ className="px-8 py-4 bg-gray-300 text-gray-700 rounded-2xl font-bold uppercase hover:bg-gray-400">
+            Pular
+          </button>
+          <button 
+            onClick={() => handleCheck()}
+            disabled={selectedAnswer === null}
+            className={`
+              px-8 py-4 rounded-2xl font-bold uppercase transition-colors
+              ${selectedAnswer !== null
+                ? 'bg-[#58CC02] text-white hover:bg-[#4cb302]'
+                : 'bg-gray-300 text-gray-500 cursor-not-allowed opacity-50'
+              }
+            `}
+          >
+            Verificar
+          </button>
+        </div>
       </div>
 
-      {/* 21. Popup de feedback */}
+      {/* Popup de feedback */}
       <AnswerFeedbackPopup
-        isOpen={showFeedback && showResult}
-        type={feedbackType}
-        onContinue={handleNext}
-        isLoading={false}
+        isOpen={showFeedback}
+        type={isCorrect ? 'correct' : 'incorrect'}
+        onContinue={handleContinue}
       />
     </div>
   )
 }
 
 export default LessonScreen
+
+
+// import { useState } from 'react'
+// import { useParams, useNavigate } from 'react-router-dom'
+// import { X } from 'lucide-react'
+// import { lessonsData, type Question } from '@/lib/lessonsData'
+// import AnswerFeedbackPopup from '@/components/AnswerFeedbackPopup'
+
+// const LessonScreen = () => {
+//   // 1. Pegar o ID da lição da URL
+//   const { lessonId } = useParams<{ lessonId: string }>()
+//   const navigate = useNavigate()
+
+//   // 2. Estados da lição
+//   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
+//   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null)
+//   const [showResult, setShowResult] = useState(false)
+//   const [lives, setLives] = useState(3)
+//   const [isCorrect, setIsCorrect] = useState(false)
+//   const [correctAnswers, setCorrectAnswers] = useState(0)
+//   const [wrongAnswers, setWrongAnswers] = useState(0)
+//   const [showFeedback, setShowFeedback] = useState(false)
+//   const [feedbackType, setFeedbackType] = useState<'correct' | 'incorrect' | null>(null)
+
+//   // 3. Buscar a lição atual baseada no ID da URL (sempre do nível beginner)
+//   const lesson = lessonId
+//     ? lessonsData['beginner'].find(l => l.id === lessonId)
+//     : null
+
+//   // 4. Se não encontrou a lição, mostra mensagem de erro
+//   if (!lesson) {
+//     return (
+//       <div className="min-h-screen bg-white flex items-center justify-center">
+//         <div className="text-center">
+//           <p className="text-gray-600 mb-4">Lição não encontrada</p>
+//           <button
+//             onClick={() => navigate('/')}
+//             className="bg-[#58CC02] text-white px-6 py-2 rounded-xl"
+//           >
+//             Voltar
+//           </button>
+//         </div>
+//       </div>
+//     )
+//   }
+
+//   // 5. Pegar a pergunta atual e calcular progresso
+//   const currentQuestion: Question = lesson.questions[currentQuestionIndex]
+//   const totalQuestions = lesson.questions.length
+//   // Progresso: avança quando a pergunta é respondida corretamente
+//   const progress = showResult && isCorrect 
+//     ? ((currentQuestionIndex + 1) / totalQuestions) * 100
+//     : (currentQuestionIndex / totalQuestions) * 100
+
+//   // 6. Função ao selecionar uma resposta
+//   const handleAnswerSelect = (index: number) => {
+//     if (showResult) return // Não permite mudar depois de verificar
+//     setSelectedAnswer(index)
+//   }
+
+//   // 7. Função ao clicar em "Verificar"
+//   const handleCheck = () => {
+//     if (selectedAnswer === null) return // Precisa ter selecionado algo
+
+//     // Verificar se está correto
+//     const correct = selectedAnswer === currentQuestion.correctAnswer
+//     setIsCorrect(correct)
+//     setShowResult(true)
+
+//     // Mostrar feedback
+//     setFeedbackType(correct ? 'correct' : 'incorrect')
+//     setShowFeedback(true)
+
+//     // Atualizar contadores
+//     if (correct) {
+//       setCorrectAnswers(prev => prev + 1)
+//     } else {
+//       setWrongAnswers(prev => prev + 1)
+//       setLives(prev => Math.max(0, prev - 1))
+//     }
+
+//     // DEBUG
+//     console.log('Após check:', {
+//       correct,
+//       correctAnswers,
+//       wrongAnswers,
+//       currentIndex: currentQuestionIndex,
+//       totalQuestions
+//     })
+//   }
+
+
+
+//   // 8. Função ao clicar em "Continuar" ou "Finalizar"
+//   const handleNext = () => {
+//     // Esconder feedback antes de avançar
+//     setShowFeedback(false)
+//     setFeedbackType(null)
+
+//     // DEBUG - Ver valores ANTES da checagem
+//     console.log('handleNext - valores atuais:', {
+//       correctAnswers,
+//       wrongAnswers,
+//       isCorrect,
+//       currentQuestionIndex,
+//       totalQuestions
+//     })
+
+//     if (currentQuestionIndex < totalQuestions - 1) {
+//       // Ainda tem perguntas: vai para próxima
+//       setCurrentQuestionIndex(prev => prev + 1)
+//       setSelectedAnswer(null)
+//       setShowResult(false)
+//       setIsCorrect(false)
+//     } else {
+//       // Acabou todas as perguntas - calcular valores finais
+//       const finalCorrectAnswers = isCorrect ? correctAnswers + 1 : correctAnswers
+//       const finalWrongAnswers = isCorrect ? wrongAnswers : wrongAnswers + 1
+      
+//       // Se acertou todas, vai para tela de sucesso
+//       if (finalWrongAnswers === 0) {
+//         console.log('Navegando para sucesso - XP:', lesson.xpReward)
+        
+//         navigate('/lesson-success', {
+//           state: {
+//             lessonId,
+//             xpEarned: lesson.xpReward,
+//             accuracy: 100,
+//           },
+//         })
+//       } else {
+//         // Se teve erros, vai para tela de resultado
+//         console.log('Navegando para resultado')
+        
+//         navigate('/lesson-result', {
+//           state: {
+//             correctAnswers: finalCorrectAnswers,
+//             wrongAnswers: finalWrongAnswers,
+//             totalQuestions,
+//             lessonId,
+//           },
+//         })
+//       }
+//     }
+//   }
+
+//   // 9. Função para pular pergunta
+//   const handleSkip = () => {
+//     if (currentQuestionIndex < totalQuestions - 1) {
+//       setCurrentQuestionIndex(currentQuestionIndex + 1)
+//       setSelectedAnswer(null)
+//       setShowResult(false)
+//       setIsCorrect(false)
+//     }
+//   }
+
+//   // 10. Se perdeu todas as vidas, mostra mensagem
+//   if (lives <= 0 && currentQuestionIndex < totalQuestions - 1) {
+//     return (
+//       <div className="min-h-screen bg-white flex items-center justify-center">
+//         <div className="text-center">
+//           <h2 className="text-2xl font-bold mb-4 text-red-600">Você perdeu todas as vidas!</h2>
+//           <button
+//             onClick={() => navigate('/')}
+//             className="bg-[#58CC02] text-white px-6 py-2 rounded-xl"
+//           >
+//             Voltar para Home
+//           </button>
+//         </div>
+//       </div>
+//     )
+//   }
+
+//   return (
+//     <div className="min-h-screen bg-white">
+//       {/* ===== TOP BAR ===== */}
+//       <div className="bg-white border-b border-gray-200 py-4 px-4">
+//         <div className="flex items-center justify-between max-w-4xl mx-auto">
+//           {/* 11. Botão de fechar */}
+//           <button
+//             onClick={() => navigate('/')}
+//             className="text-gray-600 hover:text-gray-900 transition-colors"
+//           >
+//             <X size={24} />
+//           </button>
+
+//           {/* 12. Barra de progresso */}
+//           <div className="flex-1 h-2 bg-gray-200 rounded-full mx-4 overflow-hidden">
+//             <div
+//               className="h-full bg-gray-600 rounded-full transition-all duration-300"
+//               style={{ width: `${progress}%` }}
+//             />
+//           </div>
+
+//           {/* 13. Contador de vidas */}
+//           <div className="flex items-center gap-2">
+//             <span className="text-red-500 text-xl">❤️</span>
+//             <span className="font-bold text-gray-700">{lives}</span>
+//           </div>
+//         </div>
+//       </div>
+
+//       {/* ===== CONTEÚDO PRINCIPAL ===== */}
+//       <div className="max-w-4xl mx-auto px-4 py-8">
+//         {/* 14. Badge "PALAVRA NOVA" (só na primeira pergunta) */}
+//         {currentQuestionIndex === 0 && (
+//           <div className="bg-[#9225D4] text-white px-4 py-2 rounded-full text-sm font-semibold inline-block mb-4">
+//             PALAVRA NOVA
+//           </div>
+//         )}
+
+//         {/* 15. Pergunta */}
+//         <h2 className="text-3xl font-bold text-gray-900 mb-8">
+//           {currentQuestion.question}
+//         </h2>
+
+//         {/* 16. Opções de resposta */}
+//         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+//           {currentQuestion.options?.map((option, index) => {
+//             const isSelected = selectedAnswer === index
+//             const isCorrectAnswer = index === currentQuestion.correctAnswer
+
+//             // 17. Determinar classe CSS baseada no estado
+//             let buttonClass = 'bg-white border-2 border-gray-300 text-gray-800 hover:border-gray-400'
+
+//             if (showResult) {
+//               // Depois de verificar
+//               if (isCorrectAnswer) {
+//                 buttonClass = 'bg-green-500 border-2 border-green-600 text-white'
+//               } else if (isSelected && !isCorrect) {
+//                 buttonClass = 'bg-red-500 border-2 border-red-600 text-white'
+//               } else {
+//                 buttonClass = 'bg-white border-2 border-gray-300 text-gray-800 opacity-50'
+//               }
+//             } else if (isSelected) {
+//               // Selecionado mas ainda não verificou
+//               buttonClass = 'bg-blue-100 border-2 border-blue-500 text-gray-800'
+//             }
+
+//             return (
+//               <button
+//                 key={index}
+//                 onClick={() => handleAnswerSelect(index)}
+//                 disabled={showResult}
+//                 className={`
+//                   p-6 rounded-2xl text-left transition-all relative
+//                   ${buttonClass}
+//                 `}
+//               >
+//                 {/* 18. Número no canto inferior direito */}
+//                 <div className="absolute bottom-2 right-2 w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-sm font-bold">
+//                   {index + 1}
+//                 </div>
+//                 {/* 19. Texto da opção */}
+//                 <div className="font-semibold text-lg mb-2">{option}</div>
+//               </button>
+//             )
+//           })}
+//         </div>
+
+//         {/* 20. Botões de ação (escondidos quando feedback está visível) */}
+//         {!showFeedback && (
+//           <div className="flex gap-4 justify-between">
+//             {/* Botão Pular */}
+//             <button
+//               onClick={handleSkip}
+//               disabled={showResult && isCorrect}
+//               className="px-8 py-4 bg-gray-300 text-gray-700 rounded-2xl font-bold uppercase disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-400 transition-colors"
+//             >
+//               Pular
+//             </button>
+
+//             {/* Botão Verificar ou Continuar */}
+//             {!showResult ? (
+//               <button
+//                 onClick={handleCheck}
+//                 disabled={selectedAnswer === null}
+//                 className={`
+//                   px-8 py-4 rounded-2xl font-bold uppercase transition-colors
+//                   ${selectedAnswer !== null
+//                     ? 'bg-[#58CC02] text-white hover:bg-[#4cb302]'
+//                     : 'bg-gray-300 text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-400'
+//                   }
+//                 `}
+//               >
+//                 Verificar
+//               </button>
+//             ) : (
+//               <button
+//                 onClick={handleNext}
+//                 className="px-8 py-4 bg-[#58CC02] text-white rounded-2xl font-bold uppercase hover:bg-[#4cb302] transition-colors"
+//               >
+//                 {currentQuestionIndex < totalQuestions - 1 ? 'Continuar' : 'Finalizar'}
+//               </button>
+//             )}
+//           </div>
+//         )}
+//       </div>
+
+//       {/* 21. Popup de feedback */}
+//       <AnswerFeedbackPopup
+//         isOpen={showFeedback && showResult}
+//         type={feedbackType}
+//         onContinue={handleNext}
+//         isLoading={false}
+//       />
+//     </div>
+//   )
+// }
+
+// export default LessonScreen

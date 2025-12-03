@@ -1,120 +1,41 @@
-import { useNavigate, useLocation } from 'react-router-dom'
-import { useEffect } from 'react'
+import { useLocation, useNavigate } from "react-router-dom"
 import DevlingoChar from '@/assets/images/devlingo-char.png'
-import { lessonsData } from '@/lib/lessonsData'
+import { Gem, Target } from 'lucide-react'
+import { IoDiamond } from "react-icons/io5"
 
-const STORAGE_KEY = 'devlingo_user_xp'
-const COMPLETED_UNITS_KEY = 'devlingo_completed_units'
+type LessonSuccessState = {
+  xpEarned?: number
+  accuracy?: number
+}
 
 const LessonSuccessScreen = () => {
   const navigate = useNavigate()
   const location = useLocation()
-
-  // 1. Pegar dados passados pela navegação
-  const { xpEarned, accuracy, lessonId } = (location.state as {
-    xpEarned?: number
-    accuracy?: number
-    lessonId?: string
-  }) || {}
-
-  // 2. Salvar XP e verificar conclusão de unidade
-  useEffect(() => {
-    if (xpEarned) {
-      // Salvar XP
-      const currentXP = localStorage.getItem(STORAGE_KEY)
-      const totalXP = currentXP ? parseInt(currentXP, 10) : 0
-      const newTotalXP = totalXP + xpEarned
-      
-      localStorage.setItem(STORAGE_KEY, newTotalXP.toString())
-      console.log(`XP atualizado: ${totalXP} + ${xpEarned} = ${newTotalXP}`)
-    }
-
-    // Verificar e salvar unidade concluída
-    if (lessonId) {
-      const allLessons = lessonsData['beginner'] || []
-      const lessonIndex = allLessons.findIndex(l => l.id === lessonId)
-      
-      if (lessonIndex !== -1) {
-        const totalUnits = 5
-        const lessonsPerUnit = Math.ceil(allLessons.length / totalUnits)
-        const unitId = Math.floor(lessonIndex / lessonsPerUnit) + 1
-        
-        // Verificar se todas as lições da unidade foram completadas
-        const unitStartIndex = (unitId - 1) * lessonsPerUnit
-        const unitEndIndex = Math.min(unitStartIndex + lessonsPerUnit, allLessons.length)
-        const unitLessons = allLessons.slice(unitStartIndex, unitEndIndex)
-        
-        // Buscar lições completadas
-        const completedLessonsStr = localStorage.getItem('devlingo_completed_lessons') || '[]'
-        const completedLessons: string[] = JSON.parse(completedLessonsStr)
-        
-        // Adicionar lição atual às completadas
-        if (!completedLessons.includes(lessonId)) {
-          completedLessons.push(lessonId)
-          localStorage.setItem('devlingo_completed_lessons', JSON.stringify(completedLessons))
-        }
-        
-        // Verificar se todas as lições da unidade foram completadas
-        const allUnitLessonsCompleted = unitLessons.every(lesson => 
-          completedLessons.includes(lesson.id)
-        )
-        
-        if (allUnitLessonsCompleted) {
-          // Marcar unidade como concluída
-          const completedUnitsStr = localStorage.getItem(COMPLETED_UNITS_KEY) || '[]'
-          const completedUnits: number[] = JSON.parse(completedUnitsStr)
-          
-          if (!completedUnits.includes(unitId)) {
-            completedUnits.push(unitId)
-            localStorage.setItem(COMPLETED_UNITS_KEY, JSON.stringify(completedUnits))
-            console.log(`Unidade ${unitId} concluída!`)
-          }
-        }
-      }
-    }
-  }, [xpEarned, lessonId])
-
-  // 3. Função para continuar (volta para home)
-  const handleContinue = () => {
-    navigate('/')
-  }
+  const { xpEarned, accuracy } = (location.state as LessonSuccessState) || {}
 
   return (
     <div className="min-h-screen bg-white flex flex-col items-center justify-center px-4 py-12">
-      {/* 3. Personagens animados */}
-      <div className="flex items-end justify-center gap-8 mb-8 relative">
-        {/* Personagem do usuário */}
-        <div className="relative">
-          <div className="w-32 h-40 bg-purple-200 rounded-lg flex items-center justify-center">
-            <span className="text-4xl">👨‍💻</span>
-          </div>
-        </div>
+      
+      {/* Mascote Devlingo */}
+      <img
+        src={DevlingoChar}
+        alt="Devlingo"
+        className="w-32 h-32 object-contain animate-bounce mb-8"
+      />
 
-        {/* Mascote Devlingo */}
-        <div className="relative">
-          <img
-            src={DevlingoChar}
-            alt="Devlingo"
-            className="w-32 h-32 object-contain animate-bounce"
-          />
-        </div>
-      </div>
-
-      {/* 4. Título de sucesso */}
-      <h1 className="text-5xl font-bold text-yellow-500 mb-12 text-center">
+      {/* Título de sucesso */}
+      <h1 className="text-5xl font-bold text-yellow-500 mb-12">
         Lição concluída!
       </h1>
 
-      {/* 5. Cards de estatísticas */}
+      {/* Cards de estatísticas */}
       <div className="flex gap-6 mb-12">
         {/* Card de XP */}
         <div className="bg-yellow-100 border-2 border-yellow-300 rounded-2xl p-6 min-w-[150px]">
           <div className="text-gray-700 text-sm font-semibold mb-2">TOTAL DE XP</div>
           <div className="flex items-center gap-2">
-            <span className="text-3xl">⚡</span>
-            <span className="text-3xl font-bold text-yellow-600">
-              {xpEarned || 0}
-            </span>
+              <IoDiamond size={32} className="text-blue-500" />
+            <span className="text-3xl font-bold text-yellow-600">{xpEarned || 0}</span>
           </div>
         </div>
 
@@ -122,17 +43,15 @@ const LessonSuccessScreen = () => {
         <div className="bg-green-100 border-2 border-green-300 rounded-2xl p-6 min-w-[150px]">
           <div className="text-gray-700 text-sm font-semibold mb-2">BOA</div>
           <div className="flex items-center gap-2">
-            <span className="text-3xl">🎯</span>
-            <span className="text-3xl font-bold text-green-600">
-              {accuracy || 0}%
-            </span>
+            <Target className="w-8 h-8 text-green-600" />
+            <span className="text-3xl font-bold text-green-600">{accuracy || 0}%</span>
           </div>
         </div>
       </div>
 
-      {/* 6. Botão Continuar */}
+      {/* Botão Continuar */}
       <button
-        onClick={handleContinue}
+        onClick={() => navigate('/')}
         className="bg-[#58CC02] hover:bg-[#4cb302] text-white px-16 py-4 rounded-2xl font-bold text-xl uppercase shadow-lg transition-colors"
       >
         Continuar
@@ -142,3 +61,149 @@ const LessonSuccessScreen = () => {
 }
 
 export default LessonSuccessScreen
+
+
+// import { useNavigate, useLocation } from 'react-router-dom'
+// import { useEffect } from 'react'
+// import DevlingoChar from '@/assets/images/devlingo-char.png'
+// import { lessonsData } from '@/lib/lessonsData'
+
+// const STORAGE_KEY = 'devlingo_user_xp'
+// const COMPLETED_UNITS_KEY = 'devlingo_completed_units'
+
+// const LessonSuccessScreen = () => {
+//   const navigate = useNavigate()
+//   const location = useLocation()
+
+//   // 1. Pegar dados passados pela navegação
+//   const { xpEarned, accuracy, lessonId } = (location.state as {
+//     xpEarned?: number
+//     accuracy?: number
+//     lessonId?: string
+//   }) || {}
+
+//   // 2. Salvar XP e verificar conclusão de unidade
+//   useEffect(() => {
+//     if (xpEarned) {
+//       // Salvar XP
+//       const currentXP = localStorage.getItem(STORAGE_KEY)
+//       const totalXP = currentXP ? parseInt(currentXP, 10) : 0
+//       const newTotalXP = totalXP + xpEarned
+      
+//       localStorage.setItem(STORAGE_KEY, newTotalXP.toString())
+//       console.log(`XP atualizado: ${totalXP} + ${xpEarned} = ${newTotalXP}`)
+//     }
+
+//     // Verificar e salvar unidade concluída
+//     if (lessonId) {
+//       const allLessons = lessonsData['beginner'] || []
+//       const lessonIndex = allLessons.findIndex(l => l.id === lessonId)
+      
+//       if (lessonIndex !== -1) {
+//         const totalUnits = 5
+//         const lessonsPerUnit = Math.ceil(allLessons.length / totalUnits)
+//         const unitId = Math.floor(lessonIndex / lessonsPerUnit) + 1
+        
+//         // Verificar se todas as lições da unidade foram completadas
+//         const unitStartIndex = (unitId - 1) * lessonsPerUnit
+//         const unitEndIndex = Math.min(unitStartIndex + lessonsPerUnit, allLessons.length)
+//         const unitLessons = allLessons.slice(unitStartIndex, unitEndIndex)
+        
+//         // Buscar lições completadas
+//         const completedLessonsStr = localStorage.getItem('devlingo_completed_lessons') || '[]'
+//         const completedLessons: string[] = JSON.parse(completedLessonsStr)
+        
+//         // Adicionar lição atual às completadas
+//         if (!completedLessons.includes(lessonId)) {
+//           completedLessons.push(lessonId)
+//           localStorage.setItem('devlingo_completed_lessons', JSON.stringify(completedLessons))
+//         }
+        
+//         // Verificar se todas as lições da unidade foram completadas
+//         const allUnitLessonsCompleted = unitLessons.every(lesson => 
+//           completedLessons.includes(lesson.id)
+//         )
+        
+//         if (allUnitLessonsCompleted) {
+//           // Marcar unidade como concluída
+//           const completedUnitsStr = localStorage.getItem(COMPLETED_UNITS_KEY) || '[]'
+//           const completedUnits: number[] = JSON.parse(completedUnitsStr)
+          
+//           if (!completedUnits.includes(unitId)) {
+//             completedUnits.push(unitId)
+//             localStorage.setItem(COMPLETED_UNITS_KEY, JSON.stringify(completedUnits))
+//             console.log(`Unidade ${unitId} concluída!`)
+//           }
+//         }
+//       }
+//     }
+//   }, [xpEarned, lessonId])
+
+//   // 3. Função para continuar (volta para home)
+//   const handleContinue = () => {
+//     navigate('/')
+//   }
+
+//   return (
+//     <div className="min-h-screen bg-white flex flex-col items-center justify-center px-4 py-12">
+//       {/* 3. Personagens animados */}
+//       <div className="flex items-end justify-center gap-8 mb-8 relative">
+//         {/* Personagem do usuário */}
+//         <div className="relative">
+//           <div className="w-32 h-40 bg-purple-200 rounded-lg flex items-center justify-center">
+//             <span className="text-4xl">👨‍💻</span>
+//           </div>
+//         </div>
+
+//         {/* Mascote Devlingo */}
+//         <div className="relative">
+//           <img
+//             src={DevlingoChar}
+//             alt="Devlingo"
+//             className="w-32 h-32 object-contain animate-bounce"
+//           />
+//         </div>
+//       </div>
+
+//       {/* 4. Título de sucesso */}
+//       <h1 className="text-5xl font-bold text-yellow-500 mb-12 text-center">
+//         Lição concluída!
+//       </h1>
+
+//       {/* 5. Cards de estatísticas */}
+//       <div className="flex gap-6 mb-12">
+//         {/* Card de XP */}
+//         <div className="bg-yellow-100 border-2 border-yellow-300 rounded-2xl p-6 min-w-[150px]">
+//           <div className="text-gray-700 text-sm font-semibold mb-2">TOTAL DE XP</div>
+//           <div className="flex items-center gap-2">
+//             <span className="text-3xl">⚡</span>
+//             <span className="text-3xl font-bold text-yellow-600">
+//               {xpEarned || 0}
+//             </span>
+//           </div>
+//         </div>
+
+//         {/* Card de Precisão */}
+//         <div className="bg-green-100 border-2 border-green-300 rounded-2xl p-6 min-w-[150px]">
+//           <div className="text-gray-700 text-sm font-semibold mb-2">BOA</div>
+//           <div className="flex items-center gap-2">
+//             <span className="text-3xl">🎯</span>
+//             <span className="text-3xl font-bold text-green-600">
+//               {accuracy || 0}%
+//             </span>
+//           </div>
+//         </div>
+//       </div>
+
+//       {/* 6. Botão Continuar */}
+//       <button
+//         onClick={handleContinue}
+//         className="bg-[#58CC02] hover:bg-[#4cb302] text-white px-16 py-4 rounded-2xl font-bold text-xl uppercase shadow-lg transition-colors"x'
+//       >
+//         Continuar
+//       </button>
+//     </div>
+//   )
+// }
+
+// export default LessonSuccessScreen

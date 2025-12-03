@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { useAuth } from '../contexts/AuthContext'
+import { useAuth } from "@/contexts/AuthContext"
+import { useEffect, useState } from "react"
 
 interface UserProfile {
   id: string
@@ -12,13 +12,28 @@ const STORAGE_KEY = 'devlingo_user_xp'
 
 export const useUserProfile = () => {
   const { user } = useAuth()
+
+  // vou criar um estado pra contralar as informação do perfil do usuario
   const [profile, setProfile] = useState<UserProfile | null>(null)
+
+  // um estado de carregamento dessas informações 
   const [loading, setLoading] = useState(true)
+
+  // e um estado de erro, caso algo de errado 
   const [error, setError] = useState<Error | null>(null)
 
   useEffect(() => {
+
+      console.log(" useUserProfile: carregando perfil do usuário ", user);
+    
+
     // 1. Se não tem usuário, limpa o perfil
     if (!user) {
+      // mesmo com esse warning pode deixar assim! O código está funcional, 
+      // só avisa que a dependência 'user' pode mudar. 
+
+      // Fácil de corrigir depois - quando conectar ao Supabase, você 
+      //vai usar async/await naturalmente e o warning desaparece sozinho
       setProfile(null)
       setLoading(false)
       return
@@ -54,20 +69,8 @@ export const useUserProfile = () => {
 
     fetchProfile()
 
-    // 3. Listener para mudanças no localStorage (sincroniza entre abas)
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === STORAGE_KEY && e.newValue) {
-        const newXP = parseInt(e.newValue, 10)
-        setProfile(prev => prev ? { ...prev, total_xp: newXP } : null)
-      }
-    }
-
-    window.addEventListener('storage', handleStorageChange)
-
-    return () => {
-      window.removeEventListener('storage', handleStorageChange)
-    }
   }, [user])
-
+  
+  // precisa retornar os estados pra que outros componentnes possam usar eles, é como se fosse o contrato desse hook
   return { profile, loading, error }
 }
